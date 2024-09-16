@@ -1116,3 +1116,45 @@ SlashCmdList["IGNORE"] = function(msg)
 		ShowIgnorePanel()
 	end
 end
+
+--Add Ignore button to dropdown menus
+UnitPopupButtons["IGNORE"]	= { text = TEXT(IGNORE), dist = 0 };
+tinsert(UnitPopupMenus["FRIEND"], 4, "IGNORE");
+tinsert(UnitPopupMenus["PLAYER"], 8, "IGNORE");
+tinsert(UnitPopupMenus["RAID"], 5, "IGNORE");
+tinsert(UnitPopupMenus["PARTY"], 10, "IGNORE");
+
+local function PostHookFunction(original, hook)	
+	return function(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
+		original(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
+		hook(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
+	end
+end
+
+local function SI_UnitPopup_HideButtons()
+	local dropdownMenu = getglobal(UIDROPDOWNMENU_INIT_MENU);
+	local canCoop = 0;
+	if ( dropdownMenu.unit and UnitCanCooperate("player", dropdownMenu.unit) ) then
+		canCoop = 1;
+	end
+	for index, value in ipairs(UnitPopupMenus[dropdownMenu.which]) do
+		if ( value == "IGNORE" ) then
+			if ( dropdownMenu.name == UnitName("player") or (dropdownMenu.unit and canCoop == 0) ) then
+				UnitPopupShown[index] = 0;
+			end
+		end
+	end
+end
+UnitPopup_HideButtons = PostHookFunction(UnitPopup_HideButtons, SI_UnitPopup_HideButtons)
+local function SI_UnitPopup_OnClick()
+	local dropdownFrame = getglobal(UIDROPDOWNMENU_INIT_MENU);
+	local button = this.value;
+	local name = dropdownFrame.name;
+
+	if ( button == "IGNORE" ) then
+		SI_AddOrDelIgnore_New(name);
+	end
+	PlaySound("UChatScrollButton");
+end
+UnitPopup_OnClick = PostHookFunction(UnitPopup_OnClick, SI_UnitPopup_OnClick)
+----
