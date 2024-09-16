@@ -1,5 +1,4 @@
 ### TODO Features:
-- "Ignore" option when right clicking players
 - Set time individually
 - Right click menu in ignore list frame
 - Custom Filter should ignore non-latin characters
