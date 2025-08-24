@@ -94,6 +94,7 @@ SI_ChatFilter = {}
 SI_MainFrame = nil
 SI_OptionsFrame = nil
 SI_ModsFrame = nil
+SI_CurrentRealm = nil
 SI_TimeCheck_Last = 0
 
 SI_LastIgnoreListButton = nil
@@ -275,6 +276,48 @@ SI_ModSetVar = function(mod, name, value)
 	modinfo.Vars[name] = value
 end
 
+SI_GetCurrentRealm = function()
+	if not SI_CurrentRealm then
+		SI_CurrentRealm = GetRealmName()
+	end
+	return SI_CurrentRealm
+end
+
+SI_GetRealmData = function()
+	local realm = SI_GetCurrentRealm()
+	if not SI_Global[realm] then
+		SI_Global[realm] = {
+			BannedPlayers = {},
+			BannedSelected = 1,
+		}
+	end
+	return SI_Global[realm]
+end
+
+SI_GetGlobalSettings = function()
+	if not SI_Global.GlobalSettings then
+		SI_Global.GlobalSettings = {
+			WhisperBlock = false,
+			WhisperUnignore = true,
+			DebugLog = false,
+			BanDuration = T_FOREVER,
+			BanOptWhisper = true,
+			BanOptParty = false,
+			BanOptGuild = false,
+			BanOptOfficer = false,
+			BanOptSay = true,
+			BanOptYell = true,
+			BanOptBg = true,
+			BanOptPublic = true,
+			BanOptEmote = true,
+			BanOptTrade = true,
+			BanOptInvite = true,
+			BanOptDuel = true,
+		}
+	end
+	return SI_Global.GlobalSettings
+end
+
 ------------- Filter
 
 SI_AddNameFilter = function(filter)
@@ -361,7 +404,7 @@ SI_IsBanTimeOver = function(t)
 end
 SI_BannedClearRelog = function()
 	local unbanNames = {}
-	for _, banned in SI_Global.BannedPlayers do
+	for _, banned in SI_GetRealmData().BannedPlayers do
 		local d = banned[B_DURATION]
 		if d == TI_RELOG or d == TI_AUTOBLOCK then
 			table.insert(unbanNames, banned[B_NAME])
@@ -374,7 +417,7 @@ SI_BannedClearRelog = function()
 end
 SI_BannedCheckTimes = function()
 	local unbanNames = {}
-	for _, banned in SI_Global.BannedPlayers do
+	for _, banned in SI_GetRealmData().BannedPlayers do
 		if SI_IsBanTimeOver(banned[B_DURATION]) then
 			table.insert(unbanNames, banned[B_NAME])
 		end
@@ -459,14 +502,14 @@ SI_StringFindPattern = function(s, r)
 end
 
 SI_FixBannedSelected = function()
-	 local selected = SI_Global.BannedSelected
+	 local selected = SI_GetRealmData().BannedSelected
 	 if selected > 1 and selected > GetNumIgnores() then
-		SI_Global.BannedSelected = selected - 1
+		SI_GetRealmData().BannedSelected = selected - 1
 	 end
 end
 
 SI_BannedGetIndex = function(name)
-	for index, banned in SI_Global.BannedPlayers do
+	for index, banned in SI_GetRealmData().BannedPlayers do
 		if banned[B_NAME] == name then
 			return index
 		end
@@ -476,26 +519,26 @@ SI_BannedGetIndex = function(name)
 end
 
 SI_BannedGetDuration = function(index)
-	return SI_Global.BannedPlayers[index][B_DURATION]
+	return SI_GetRealmData().BannedPlayers[index][B_DURATION]
 end
 SI_BannedSetDuration = function(index, duration)
-	SI_Global.BannedPlayers[index][B_DURATION] = duration
+	SI_GetRealmData().BannedPlayers[index][B_DURATION] = duration
 end
 SI_BannedGetReason = function(index)
-	return SI_Global.BannedPlayers[index][B_REASON]
+	return SI_GetRealmData().BannedPlayers[index][B_REASON]
 end
 SI_BannedSetReason = function(index, reason)
-	SI_Global.BannedPlayers[index][B_REASON] = reason
+	SI_GetRealmData().BannedPlayers[index][B_REASON] = reason
 end
 SI_BannedGetName = function(index)
-	return SI_Global.BannedPlayers[index][B_NAME]
+	return SI_GetRealmData().BannedPlayers[index][B_NAME]
 end
 SI_BannedSetName = function(index, name)
-	SI_Global.BannedPlayers[index][B_NAME] = name
+	SI_GetRealmData().BannedPlayers[index][B_NAME] = name
 end
 
 SI_BannedSortByTime = function()
-	table.sort(SI_Global.BannedPlayers, function(a, b)
+	table.sort(SI_GetRealmData().BannedPlayers, function(a, b)
 		local at = a[B_DURATION]
 		local bt = b[B_DURATION]
 		if at == bt then
@@ -507,7 +550,7 @@ SI_BannedSortByTime = function()
 end
 
 SI_IsChannelBanned = function(c)
-	local g = SI_Global
+	local g = SI_GetGlobalSettings()
 
 	if c == "WHISPER"	then return g.BanOptWhisper end
 	if(c == "PARTY" or c == "RAID" or c == "RAID_LEADER" or c == "RAID_WARNING")
@@ -527,10 +570,10 @@ SI_IsChannelBanned = function(c)
 end
 
 SI_CheckInteractRules = function(name)
-	if SI_Global.WhisperBlock then
+	if SI_GetGlobalSettings().WhisperBlock then
 		SI_Print(string.format(SS.ChatBlocked, name))
 		return true
-	elseif SI_Global.WhisperUnignore then
+	elseif SI_GetGlobalSettings().WhisperUnignore then
 		SI_DelIgnore_New(name)
 		return false
 	else
@@ -636,7 +679,7 @@ SI_AddIgnore_New = function(name, quiet, banTime, reason)
 		SI_BannedSetDuration(index, banTime)
 		SI_BannedSetReason(index, reason)
 	else
-		table.insert(SI_Global.BannedPlayers, {name, banTime, nil, reason})
+		table.insert(SI_GetRealmData().BannedPlayers, {name, banTime, nil, reason})
 	end
 
 	SI_BannedSortByTime()
@@ -671,7 +714,7 @@ SI_DelIgnore_New = function(name, quiet)
 
 	local index = SI_BannedGetIndex(name)
 	if index then
-		 table.remove(SI_Global.BannedPlayers, index)
+		 table.remove(SI_GetRealmData().BannedPlayers, index)
 		 SI_FixBannedSelected()
 		 IgnoreList_Update()
 
@@ -682,7 +725,7 @@ SI_DelIgnore_New = function(name, quiet)
 end
 
 SI_GetIgnoreName_New = function(index)
-	local banned = SI_Global.BannedPlayers[index]
+	local banned = SI_GetRealmData().BannedPlayers[index]
 	if banned then
 		local name = banned[B_NAME]
 		local duration = banned[B_DURATION]
@@ -695,20 +738,20 @@ SI_GetIgnoreName_New = function(index)
 end
 
 SI_GetNumIgnores_New = function()
-	return table.getn(SI_Global.BannedPlayers)
+	return table.getn(SI_GetRealmData().BannedPlayers)
 end
 
 SI_GetSelectedIgnore_New = function()
-	return SI_Global.BannedSelected
+	return SI_GetRealmData().BannedSelected
 end
 
 SI_SetSelectedIgnore_New = function(index)
-	SI_Global.BannedSelected = index
+	SI_GetRealmData().BannedSelected = index
 end
 
 SI_StaticPopup_Show_New = function(which, text_arg1, text_arg2, data)
 	local name = text_arg1
-	if SI_Global.BanOptInvite then
+	if SI_GetGlobalSettings().BanOptInvite then
 		if which == "PARTY_INVITE" then
 			if SI_FilterIsPlayerIgnored(name) then
 				DeclineGroup()
@@ -723,7 +766,7 @@ SI_StaticPopup_Show_New = function(which, text_arg1, text_arg2, data)
 			end
 		end
 	end
-	if SI_Global.BanOptDuel then
+	if SI_GetGlobalSettings().BanOptDuel then
 		if which == "DUEL_REQUESTED" then
 			if SI_FilterIsPlayerIgnored(name) then
 				CancelDuel()
@@ -737,7 +780,7 @@ SI_StaticPopup_Show_New = function(which, text_arg1, text_arg2, data)
 end
 
 SI_TradeFrame_OnEvent_New = function()
-	if SI_Global.BanOptTrade then
+	if SI_GetGlobalSettings().BanOptTrade then
 		if event == "TRADE_SHOW" or event == "TRADE_UPDATE" then
 			local name = UnitName("NPC")
 			if SI_FilterIsPlayerIgnored(name) then
@@ -908,10 +951,10 @@ SI_CreateOptionsFrame = function()
 
 	local createOpt = function(index, var, desc, padding, onclick)
 		local c, ct = SI_FrameCreateOption(f, "SI_Box_"..index, desc, padding, function(checked)
-			SI_Global[var] = checked
+			SI_GetGlobalSettings()[var] = checked
 			if onclick then onclick(checked) end
 		end)
-		c:SetChecked(SI_Global[var])
+		c:SetChecked(SI_GetGlobalSettings()[var])
 
 		return c, ct
 	end
@@ -973,13 +1016,13 @@ SI_CreateOptionsFrame = function()
 			info.value = i
 			info.func = function()
 				UIDropDownMenu_SetSelectedID(dd, this:GetID())
-				SI_Global.BanDuration = this:GetID()
+				SI_GetGlobalSettings().BanDuration = this:GetID()
 			end
 			info.checked = nil
 			UIDropDownMenu_AddButton(info, 1)
 		end
 	end)
-	UIDropDownMenu_SetSelectedID(dd, SI_Global.BanDuration)
+	UIDropDownMenu_SetSelectedID(dd, SI_GetGlobalSettings().BanDuration)
 
 	f:SetHeight(40 + (- pad))
 end
@@ -1060,32 +1103,14 @@ SI_MainFrame:SetScript("OnEvent", function()
 		if string.lower(arg1) == SS.AddonDir then
 
 			if not SI_Global then
-				SI_Global = {
-					BannedPlayers	= {},
-					BannedSelected	= 1,
-
-					WhisperBlock	= false,
-					WhisperUnignore	= true,
-					DebugLog		= false,
-					BanDuration		= T_FOREVER,
-
-					BanOptWhisper	= true,
-					BanOptParty		= false,
-					BanOptGuild		= false,
-					BanOptOfficer	= false,
-					BanOptSay		= true,
-					BanOptYell		= true,
-					BanOptBg		= true,
-					BanOptPublic	= true,
-					BanOptEmote		= true,
-					BanOptTrade		= true,
-					BanOptInvite	= true,
-					BanOptDuel		= true,
-				}
+				SI_Global = {}
 			end
 			if not SI_Global.Mods then
 				SI_Global.Mods = {}
 			end
+			
+			SI_GetRealmData()
+			SI_GetGlobalSettings()
 
 			SI_HookFunctions()
 			SI_CreateFrames()
