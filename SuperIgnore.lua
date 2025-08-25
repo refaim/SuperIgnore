@@ -1,6 +1,5 @@
-
 local name = "SuperIgnore"
-local version = "1.4.5"
+local version = "1.4.6"
 
 local SS = {
 	["AddonName"]			= name,
@@ -94,6 +93,7 @@ SI_ChatFilter = {}
 SI_MainFrame = nil
 SI_OptionsFrame = nil
 SI_ModsFrame = nil
+SI_RealmSpecific = nil
 SI_TimeCheck_Last = 0
 
 SI_LastIgnoreListButton = nil
@@ -361,7 +361,7 @@ SI_IsBanTimeOver = function(t)
 end
 SI_BannedClearRelog = function()
 	local unbanNames = {}
-	for _, banned in SI_Global.BannedPlayers do
+	for _, banned in SI_RealmSpecific.BannedPlayers do
 		local d = banned[B_DURATION]
 		if d == TI_RELOG or d == TI_AUTOBLOCK then
 			table.insert(unbanNames, banned[B_NAME])
@@ -374,7 +374,7 @@ SI_BannedClearRelog = function()
 end
 SI_BannedCheckTimes = function()
 	local unbanNames = {}
-	for _, banned in SI_Global.BannedPlayers do
+	for _, banned in SI_RealmSpecific.BannedPlayers do
 		if SI_IsBanTimeOver(banned[B_DURATION]) then
 			table.insert(unbanNames, banned[B_NAME])
 		end
@@ -459,14 +459,14 @@ SI_StringFindPattern = function(s, r)
 end
 
 SI_FixBannedSelected = function()
-	 local selected = SI_Global.BannedSelected
+	 local selected = SI_RealmSpecific.BannedSelected
 	 if selected > 1 and selected > GetNumIgnores() then
-		SI_Global.BannedSelected = selected - 1
+		SI_RealmSpecific.BannedSelected = selected - 1
 	 end
 end
 
 SI_BannedGetIndex = function(name)
-	for index, banned in SI_Global.BannedPlayers do
+	for index, banned in SI_RealmSpecific.BannedPlayers do
 		if banned[B_NAME] == name then
 			return index
 		end
@@ -476,26 +476,26 @@ SI_BannedGetIndex = function(name)
 end
 
 SI_BannedGetDuration = function(index)
-	return SI_Global.BannedPlayers[index][B_DURATION]
+	return SI_RealmSpecific.BannedPlayers[index][B_DURATION]
 end
 SI_BannedSetDuration = function(index, duration)
-	SI_Global.BannedPlayers[index][B_DURATION] = duration
+	SI_RealmSpecific.BannedPlayers[index][B_DURATION] = duration
 end
 SI_BannedGetReason = function(index)
-	return SI_Global.BannedPlayers[index][B_REASON]
+	return SI_RealmSpecific.BannedPlayers[index][B_REASON]
 end
 SI_BannedSetReason = function(index, reason)
-	SI_Global.BannedPlayers[index][B_REASON] = reason
+	SI_RealmSpecific.BannedPlayers[index][B_REASON] = reason
 end
 SI_BannedGetName = function(index)
-	return SI_Global.BannedPlayers[index][B_NAME]
+	return SI_RealmSpecific.BannedPlayers[index][B_NAME]
 end
 SI_BannedSetName = function(index, name)
-	SI_Global.BannedPlayers[index][B_NAME] = name
+	SI_RealmSpecific.BannedPlayers[index][B_NAME] = name
 end
 
 SI_BannedSortByTime = function()
-	table.sort(SI_Global.BannedPlayers, function(a, b)
+	table.sort(SI_RealmSpecific.BannedPlayers, function(a, b)
 		local at = a[B_DURATION]
 		local bt = b[B_DURATION]
 		if at == bt then
@@ -636,7 +636,7 @@ SI_AddIgnore_New = function(name, quiet, banTime, reason)
 		SI_BannedSetDuration(index, banTime)
 		SI_BannedSetReason(index, reason)
 	else
-		table.insert(SI_Global.BannedPlayers, {name, banTime, nil, reason})
+		table.insert(SI_RealmSpecific.BannedPlayers, {name, banTime, nil, reason})
 	end
 
 	SI_BannedSortByTime()
@@ -671,7 +671,7 @@ SI_DelIgnore_New = function(name, quiet)
 
 	local index = SI_BannedGetIndex(name)
 	if index then
-		 table.remove(SI_Global.BannedPlayers, index)
+		 table.remove(SI_RealmSpecific.BannedPlayers, index)
 		 SI_FixBannedSelected()
 		 IgnoreList_Update()
 
@@ -682,7 +682,7 @@ SI_DelIgnore_New = function(name, quiet)
 end
 
 SI_GetIgnoreName_New = function(index)
-	local banned = SI_Global.BannedPlayers[index]
+	local banned = SI_RealmSpecific.BannedPlayers[index]
 	if banned then
 		local name = banned[B_NAME]
 		local duration = banned[B_DURATION]
@@ -695,15 +695,15 @@ SI_GetIgnoreName_New = function(index)
 end
 
 SI_GetNumIgnores_New = function()
-	return table.getn(SI_Global.BannedPlayers)
+	return table.getn(SI_RealmSpecific.BannedPlayers)
 end
 
 SI_GetSelectedIgnore_New = function()
-	return SI_Global.BannedSelected
+	return SI_RealmSpecific.BannedSelected
 end
 
 SI_SetSelectedIgnore_New = function(index)
-	SI_Global.BannedSelected = index
+	SI_RealmSpecific.BannedSelected = index
 end
 
 SI_StaticPopup_Show_New = function(which, text_arg1, text_arg2, data)
@@ -1061,9 +1061,6 @@ SI_MainFrame:SetScript("OnEvent", function()
 
 			if not SI_Global then
 				SI_Global = {
-					BannedPlayers	= {},
-					BannedSelected	= 1,
-
 					WhisperBlock	= false,
 					WhisperUnignore	= true,
 					DebugLog		= false,
@@ -1086,6 +1083,20 @@ SI_MainFrame:SetScript("OnEvent", function()
 			if not SI_Global.Mods then
 				SI_Global.Mods = {}
 			end
+
+			if not SI_Global.DataByRealm then
+				SI_Global.DataByRealm = {}
+			end
+
+			local realm = GetRealmName()
+			if not SI_Global.DataByRealm[realm] then
+				SI_Global.DataByRealm[realm] = {
+					BannedPlayers	= SI_Global.BannedPlayers or {},
+					BannedSelected	= SI_Global.BannedSelected or 1,
+				}
+			end
+
+			SI_RealmSpecific = SI_Global.DataByRealm[realm]
 
 			SI_HookFunctions()
 			SI_CreateFrames()
