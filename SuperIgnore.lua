@@ -1,5 +1,5 @@
 local name = "SuperIgnore"
-local version = "1.4.7"
+local version = "1.4.8"
 
 local SS = {
 	["AddonName"]			= name,
@@ -1046,6 +1046,12 @@ SI_CreateFrames = function()
 	SI_CreateModsFrame()
 	SI_CreateTooltips()
 	SI_CreateShowButton()
+
+	local oldOnShow = IgnoreListFrame:GetScript("OnShow")
+	IgnoreListFrame:SetScript("OnShow", function()
+		if oldOnShow then oldOnShow() end
+		IgnoreList_Update()
+	end)
 end
 
 SI_EnableIgnoreListRightclick = function()
