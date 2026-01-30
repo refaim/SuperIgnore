@@ -1,5 +1,5 @@
 local name = "SuperIgnore"
-local version = "1.4.6"
+local version = "1.4.7"
 
 local SS = {
 	["AddonName"]			= name,
@@ -618,7 +618,10 @@ SI_FriendsFrameIgnoreButton_OnClick_New = function()
 	end
 end
 
+local SI_IgnoreHandled = false
+
 SI_AddIgnore_New = function(name, quiet, banTime, reason)
+	SI_IgnoreHandled = true
 	if not name then return end
 
 	name = SI_FixPlayerName(name)
@@ -654,6 +657,7 @@ SI_AddIgnore_New = function(name, quiet, banTime, reason)
 end
 
 SI_AddOrDelIgnore_New = function(name, quiet, banTime, reason)
+	SI_IgnoreHandled = true
 	local index = SI_BannedGetIndex(name)
 	if index then
 		SI_DelIgnore_New(name, quiet)
@@ -663,6 +667,7 @@ SI_AddOrDelIgnore_New = function(name, quiet, banTime, reason)
 end
 
 SI_DelIgnore_New = function(name, quiet)
+	SI_IgnoreHandled = true
 	if not name then return end
 
 	name = string.gsub(name, "^%|cff(.-)%|r ", "") -- Remove time
@@ -1128,12 +1133,14 @@ SlashCmdList["IGNORE"] = function(msg)
 	end
 end
 
---Add Ignore button to dropdown menus
-UnitPopupButtons["IGNORE"]	= { text = TEXT(IGNORE), dist = 0 };
-tinsert(UnitPopupMenus["FRIEND"], 4, "IGNORE");
-tinsert(UnitPopupMenus["PLAYER"], 8, "IGNORE");
-tinsert(UnitPopupMenus["RAID"], 5, "IGNORE");
-tinsert(UnitPopupMenus["PARTY"], 10, "IGNORE");
+--Add Ignore button to dropdown menus (skip on Turtle WoW, which already has it)
+if getglobal("TURTLE_WOW_VERSION") == nil then
+	UnitPopupButtons["IGNORE"]	= { text = TEXT(IGNORE), dist = 0 };
+	tinsert(UnitPopupMenus["FRIEND"], 4, "IGNORE");
+	tinsert(UnitPopupMenus["PLAYER"], 8, "IGNORE");
+	tinsert(UnitPopupMenus["RAID"], 5, "IGNORE");
+	tinsert(UnitPopupMenus["PARTY"], 10, "IGNORE");
+end
 
 local function PostHookFunction(original, hook)	
 	return function(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10)
@@ -1162,9 +1169,10 @@ local function SI_UnitPopup_OnClick()
 	local button = this.value;
 	local name = dropdownFrame.name;
 
-	if ( button == "IGNORE" ) then
+	if ( button == "IGNORE" and not SI_IgnoreHandled ) then
 		SI_AddOrDelIgnore_New(name);
 	end
+	SI_IgnoreHandled = false
 	PlaySound("UChatScrollButton");
 end
 UnitPopup_OnClick = PostHookFunction(UnitPopup_OnClick, SI_UnitPopup_OnClick)
